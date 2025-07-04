@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTO Range Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 140px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 150%;
+            left: 50%;
+            margin-left: -70px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #555 transparent transparent transparent;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">GTO Range to PioSolver Converter</h1>
+            <p class="text-gray-400 mt-2">Upload a GTO Wizard range grid to extract Calling (Green) and Raising (Red/Orange) ranges.</p>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex flex-col lg:flex-row gap-8">
+
+            <!-- Left Column: Instructions & Input -->
+            <div class="lg:w-1/3 flex flex-col gap-6">
+                <div class="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+                    <h2 class="text-lg font-semibold text-white mb-2">Instructions</h2>
+                    <ol class="list-decimal list-inside text-gray-300 space-y-1">
+                        <li>Take a screenshot of a range from GTO Wizard.</li>
+                        <li><strong>Important:</strong> Crop the image to the 13x13 grid only.</li>
+                        <li>Select your cropped image file.</li>
+                        <li>Click "Convert Range" to process.</li>
+                    </ol>
+                </div>
+                <div class="flex flex-col items-center bg-gray-700/30 p-4 rounded-lg">
+                    <h3 class="text-xl font-semibold mb-4 text-white">Upload Image</h3>
+                    <input type="file" id="image-uploader" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-500 file:text-white hover:file:bg-indigo-600 transition-colors cursor-pointer">
+                    <div id="image-preview-container" class="mt-4 w-full aspect-square bg-gray-700 rounded-lg flex items-center justify-center hidden">
+                        <img id="image-preview" src="#" alt="Image Preview" class="max-w-full max-h-full rounded-md object-contain">
+                    </div>
+                    <p id="image-prompt" class="mt-4 text-gray-500">No image selected</p>
+                </div>
+            </div>
+
+            <!-- Right Column: Action & Outputs -->
+            <div class="lg:w-2/3 flex flex-col">
+                <button id="convert-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg disabled:bg-gray-500 disabled:cursor-not-allowed mb-4" disabled>
+                    Convert Range
+                </button>
+                <div id="spinner" class="hidden self-center my-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400"></div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Calling Range Output -->
+                    <div class="bg-gray-700/30 p-4 rounded-lg">
+                        <h3 class="text-xl font-semibold mb-3 text-green-400">Calling Range (Green)</h3>
+                        <div class="relative">
+                            <textarea id="output-text-call" rows="12" class="w-full bg-gray-900 border border-gray-600 rounded-md p-3 text-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition" placeholder="Calling range will appear here..."></textarea>
+                            <div class="absolute top-2 right-2 tooltip">
+                                <button id="copy-btn-call" class="bg-gray-700 hover:bg-gray-600 text-gray-300 p-2 rounded-md transition-colors">
+                                    <span class="tooltiptext" id="copy-tooltip-call">Copy to clipboard</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Raising Range Output -->
+                    <div class="bg-gray-700/30 p-4 rounded-lg">
+                        <h3 class="text-xl font-semibold mb-3 text-red-400">Raising Range (Red/Orange)</h3>
+                        <div class="relative">
+                            <textarea id="output-text-raise" rows="12" class="w-full bg-gray-900 border border-gray-600 rounded-md p-3 text-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition" placeholder="Raising range will appear here..."></textarea>
+                            <div class="absolute top-2 right-2 tooltip">
+                                <button id="copy-btn-raise" class="bg-gray-700 hover:bg-gray-600 text-gray-300 p-2 rounded-md transition-colors">
+                                    <span class="tooltiptext" id="copy-tooltip-raise">Copy to clipboard</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden canvas for image processing -->
+    <canvas id="image-canvas" class="hidden"></canvas>
+
+    <script>
+        // --- DOM Elements ---
+        const imageUploader = document.getElementById('image-uploader');
+        const imagePreview = document.getElementById('image-preview');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePrompt = document.getElementById('image-prompt');
+        const convertBtn = document.getElementById('convert-btn');
+        const spinner = document.getElementById('spinner');
+        
+        const outputCall = document.getElementById('output-text-call');
+        const outputRaise = document.getElementById('output-text-raise');
+        const copyBtnCall = document.getElementById('copy-btn-call');
+        const copyBtnRaise = document.getElementById('copy-btn-raise');
+        const copyTooltipCall = document.getElementById('copy-tooltip-call');
+        const copyTooltipRaise = document.getElementById('copy-tooltip-raise');
+
+        const canvas = document.getElementById('image-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        // --- Poker Hand Matrix ---
+        const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+        const combosMatrix = RANKS.map((rank1, i) => 
+            RANKS.map((rank2, j) => {
+                if (i === j) return rank1 + rank2; // Pairs
+                if (j > i) return rank1 + rank2 + 's'; // Suited
+                return rank2 + rank1 + 'o'; // Off-suit
+            })
+        );
+
+        // --- Event Listeners ---
+        imageUploader.addEventListener('change', handleImageUpload);
+        convertBtn.addEventListener('click', processImage);
+        copyBtnCall.addEventListener('click', () => copyToClipboard(outputCall, copyTooltipCall));
+        copyBtnRaise.addEventListener('click', () => copyToClipboard(outputRaise, copyTooltipRaise));
+
+        // --- Functions ---
+        
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    imagePreview.src = event.target.result;
+                    imagePreviewContainer.classList.remove('hidden');
+                    imagePrompt.classList.add('hidden');
+                    convertBtn.disabled = false;
+                    outputCall.value = '';
+                    outputRaise.value = '';
+                }
+                reader.readAsDataURL(file);
+            } else {
+                imagePreviewContainer.classList.add('hidden');
+                imagePrompt.classList.remove('hidden');
+                convertBtn.disabled = true;
+            }
+        }
+
+        function isRaisingColor(r, g, b) {
+            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 30;
+            return isSaturated && r > g && r > b && r > 80;
+        }
+
+        function isCallingColor(r, g, b) {
+            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 20;
+            return isSaturated && g > r && g > b && g > 70;
+        }
+
+        async function processImage() {
+            if (!imagePreview.src || imagePreview.src.startsWith('#')) return;
+
+            spinner.classList.remove('hidden');
+            convertBtn.disabled = true;
+            convertBtn.textContent = 'Processing...';
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                canvas.width = imagePreview.naturalWidth;
+                canvas.height = imagePreview.naturalHeight;
+                ctx.drawImage(imagePreview, 0, 0);
+
+                const cellWidth = canvas.width / 13;
+                const cellHeight = canvas.height / 13;
+                const pioCallRange = [];
+                const pioRaiseRange = [];
+
+                for (let row = 0; row < 13; row++) {
+                    for (let col = 0; col < 13; col++) {
+                        const comboName = combosMatrix[row][col];
+                        
+                        const startX = Math.floor(col * cellWidth);
+                        const endX = Math.floor(startX + cellWidth);
+                        const startY = Math.floor(row * cellHeight);
+
+                        const sampleLinesY = [0.25, 0.5, 0.75]; 
+                        let totalCallWeight = 0;
+                        let totalRaiseWeight = 0;
+
+                        for (const samplePercent of sampleLinesY) {
+                            const sampleY = Math.floor(startY + (cellHeight * samplePercent));
+                            let callingPixelCount = 0;
+                            let raisingPixelCount = 0;
+                            
+                            for (let x = startX; x < endX; x++) {
+                                try {
+                                    const pixelData = ctx.getImageData(x, sampleY, 1, 1).data;
+                                    const [r, g, b] = pixelData;
+
+                                    if (isRaisingColor(r, g, b)) {
+                                        raisingPixelCount++;
+                                    } else if (isCallingColor(r, g, b)) {
+                                        callingPixelCount++;
+                                    }
+                                } catch (e) {
+                                    // Ignore errors at the very edge of the canvas if they occur
+                                }
+                            }
+                            totalCallWeight += (callingPixelCount / cellWidth);
+                            totalRaiseWeight += (raisingPixelCount / cellWidth);
+                        }
+                        
+                        const callWeight = totalCallWeight / sampleLinesY.length;
+                        const raiseWeight = totalRaiseWeight / sampleLinesY.length;
+                        const weightThreshold = 0.05;
+                        const fullWeightThreshold = 0.97; 
+
+                        if (callWeight >= fullWeightThreshold) {
+                            pioCallRange.push(comboName);
+                        } else if (callWeight > weightThreshold) {
+                            pioCallRange.push(`${comboName}:${callWeight.toFixed(2)}`);
+                        }
+
+                        if (raiseWeight >= fullWeightThreshold) {
+                            pioRaiseRange.push(comboName);
+                        } else if (raiseWeight > weightThreshold) {
+                            pioRaiseRange.push(`${comboName}:${raiseWeight.toFixed(2)}`);
+                        }
+                    }
+                }
+
+                outputCall.value = pioCallRange.join(',');
+                outputRaise.value = pioRaiseRange.join(',');
+
+            } catch (error) {
+                console.error("Error processing image:", error);
+                outputCall.value = "An error occurred during processing.";
+                outputRaise.value = "Please ensure you've uploaded a valid, cropped grid image.";
+            } finally {
+                spinner.classList.add('hidden');
+                convertBtn.disabled = false;
+                convertBtn.textContent = 'Convert Range';
+            }
+        }
+
+        function copyToClipboard(textareaElement, tooltipElement) {
+            if (!textareaElement.value) return;
+            
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = textareaElement.value;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                document.execCommand('copy');
+                tooltipElement.textContent = 'Copied!';
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                tooltipElement.textContent = 'Failed to copy!';
+            }
+            document.body.removeChild(tempTextArea);
+
+            setTimeout(() => {
+                tooltipElement.textContent = 'Copy to clipboard';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
