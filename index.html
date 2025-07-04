@@ -200,13 +200,13 @@
         }
 
         function isRaisingColor(r, g, b) {
-            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 30;
-            return isSaturated && r > g && r > b && r > 80;
+            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 25; // More lenient
+            return isSaturated && r > g && r > b && r > 70;
         }
 
         function isCallingColor(r, g, b) {
-            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 20;
-            return isSaturated && g > r && g > b && g > 70;
+            const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 15; // More lenient
+            return isSaturated && g > r && g > b && g > 60;
         }
 
         async function processImage() {
@@ -232,21 +232,21 @@
                     for (let col = 0; col < 13; col++) {
                         const comboName = combosMatrix[row][col];
                         
-                        // --- NEW: Area Sampling for Accuracy ---
-                        // Define a sampling rectangle in the center of the cell to avoid edges and text.
-                        const sampleMarginX = cellWidth * 0.25;
-                        const sampleMarginY = cellHeight * 0.25;
+                        // --- UPDATED: Targeted Bar Sampling ---
+                        // Sample a wide rectangle at the bottom of the cell to isolate the bar.
+                        const sampleMarginX = cellWidth * 0.1; // Reduce horizontal margin
+                        const sampleAreaHeight = cellHeight * 0.4; // Height of the sampling area
+                        const sampleAreaYOffset = cellHeight * 0.55; // Start sampling lower down
 
                         const startX = Math.floor(col * cellWidth + sampleMarginX);
                         const endX = Math.floor(startX + cellWidth - (2 * sampleMarginX));
-                        const startY = Math.floor(row * cellHeight + sampleMarginY);
-                        const endY = Math.floor(startY + cellHeight - (2 * sampleMarginY));
+                        const startY = Math.floor(row * cellHeight + sampleAreaYOffset);
+                        const endY = Math.floor(startY + sampleAreaHeight);
 
                         let callingPixelCount = 0;
                         let raisingPixelCount = 0;
-                        let backgroundPixelCount = 0;
                         
-                        // Iterate over every pixel in the sampling rectangle
+                        // Iterate over every pixel in the targeted sampling rectangle
                         for (let y = startY; y < endY; y++) {
                             for (let x = startX; x < endX; x++) {
                                 try {
@@ -257,11 +257,9 @@
                                         raisingPixelCount++;
                                     } else if (isCallingColor(r, g, b)) {
                                         callingPixelCount++;
-                                    } else {
-                                        backgroundPixelCount++;
                                     }
                                 } catch (e) {
-                                    // Ignore errors at the very edge of the canvas
+                                    // Ignore errors
                                 }
                             }
                         }
@@ -272,17 +270,18 @@
                         let callWeight = callingPixelCount / totalSampledPixels;
                         let raiseWeight = raisingPixelCount / totalSampledPixels;
                         
-                        // --- NEW: Weight Normalization ---
+                        // --- UPDATED: More Aggressive Normalization ---
                         const totalActionWeight = callWeight + raiseWeight;
-                        // If the cell is almost entirely colored actions (very little background),
-                        // normalize the weights to sum to 1.
-                        if (totalActionWeight > 0.9 && totalActionWeight > 0) {
-                            callWeight = callWeight / totalActionWeight;
-                            raiseWeight = raiseWeight / totalActionWeight;
+                        if (totalActionWeight > 0.85 && totalActionWeight > 0) {
+                            const totalColoredPixels = callingPixelCount + raisingPixelCount;
+                            if (totalColoredPixels > 0) {
+                                callWeight = callingPixelCount / totalColoredPixels;
+                                raiseWeight = raisingPixelCount / totalColoredPixels;
+                            }
                         }
 
                         const weightThreshold = 0.05;
-                        const fullWeightThreshold = 0.99; // Can be higher due to normalization
+                        const fullWeightThreshold = 0.98; // Adjusted threshold
 
                         if (callWeight >= fullWeightThreshold) {
                             pioCallRange.push(comboName);
