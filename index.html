@@ -160,15 +160,10 @@
         convertBtn.addEventListener('click', processImage);
         copyBtnCall.addEventListener('click', () => copyToClipboard(outputCall, copyTooltipCall));
         copyBtnRaise.addEventListener('click', () => copyToClipboard(outputRaise, copyTooltipRaise));
-        
-        // --- NEW: Paste Event Listener ---
         document.addEventListener('paste', handlePaste);
 
         // --- Functions ---
         
-        /**
-         * Handles the file input change event.
-         */
         function handleImageUpload(e) {
             const file = e.target.files[0];
             if (file) {
@@ -176,30 +171,20 @@
             }
         }
 
-        /**
-         * Handles the paste event for the entire document.
-         */
         function handlePaste(e) {
-            // Prevent the default paste action
             e.preventDefault();
-
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (const item of items) {
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                     const imageFile = item.getAsFile();
                     displayImageFile(imageFile);
-                    // Add a visual cue that paste was successful
                     document.body.classList.add('paste-target');
                     setTimeout(() => document.body.classList.remove('paste-target'), 500);
-                    break; // Stop after finding the first image
+                    break;
                 }
             }
         }
 
-        /**
-         * Takes a file object (from upload or paste), reads it, and displays the preview.
-         * @param {File} file The image file to display.
-         */
         function displayImageFile(file) {
              if (!file) return;
              const reader = new FileReader();
@@ -213,7 +198,6 @@
              }
              reader.readAsDataURL(file);
         }
-
 
         function isRaisingColor(r, g, b) {
             const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 30;
@@ -248,41 +232,57 @@
                     for (let col = 0; col < 13; col++) {
                         const comboName = combosMatrix[row][col];
                         
-                        const startX = Math.floor(col * cellWidth);
-                        const endX = Math.floor(startX + cellWidth);
-                        const startY = Math.floor(row * cellHeight);
+                        // --- NEW: Area Sampling for Accuracy ---
+                        // Define a sampling rectangle in the center of the cell to avoid edges and text.
+                        const sampleMarginX = cellWidth * 0.25;
+                        const sampleMarginY = cellHeight * 0.25;
 
-                        const sampleLinesY = [0.25, 0.5, 0.75]; 
-                        let totalCallWeight = 0;
-                        let totalRaiseWeight = 0;
+                        const startX = Math.floor(col * cellWidth + sampleMarginX);
+                        const endX = Math.floor(startX + cellWidth - (2 * sampleMarginX));
+                        const startY = Math.floor(row * cellHeight + sampleMarginY);
+                        const endY = Math.floor(startY + cellHeight - (2 * sampleMarginY));
 
-                        for (const samplePercent of sampleLinesY) {
-                            const sampleY = Math.floor(startY + (cellHeight * samplePercent));
-                            let callingPixelCount = 0;
-                            let raisingPixelCount = 0;
-                            
+                        let callingPixelCount = 0;
+                        let raisingPixelCount = 0;
+                        let backgroundPixelCount = 0;
+                        
+                        // Iterate over every pixel in the sampling rectangle
+                        for (let y = startY; y < endY; y++) {
                             for (let x = startX; x < endX; x++) {
                                 try {
-                                    const pixelData = ctx.getImageData(x, sampleY, 1, 1).data;
+                                    const pixelData = ctx.getImageData(x, y, 1, 1).data;
                                     const [r, g, b] = pixelData;
 
                                     if (isRaisingColor(r, g, b)) {
                                         raisingPixelCount++;
                                     } else if (isCallingColor(r, g, b)) {
                                         callingPixelCount++;
+                                    } else {
+                                        backgroundPixelCount++;
                                     }
                                 } catch (e) {
-                                    // Ignore errors at the very edge of the canvas if they occur
+                                    // Ignore errors at the very edge of the canvas
                                 }
                             }
-                            totalCallWeight += (callingPixelCount / cellWidth);
-                            totalRaiseWeight += (raisingPixelCount / cellWidth);
                         }
                         
-                        const callWeight = totalCallWeight / sampleLinesY.length;
-                        const raiseWeight = totalRaiseWeight / sampleLinesY.length;
+                        const totalSampledPixels = (endX - startX) * (endY - startY);
+                        if (totalSampledPixels === 0) continue;
+
+                        let callWeight = callingPixelCount / totalSampledPixels;
+                        let raiseWeight = raisingPixelCount / totalSampledPixels;
+                        
+                        // --- NEW: Weight Normalization ---
+                        const totalActionWeight = callWeight + raiseWeight;
+                        // If the cell is almost entirely colored actions (very little background),
+                        // normalize the weights to sum to 1.
+                        if (totalActionWeight > 0.9 && totalActionWeight > 0) {
+                            callWeight = callWeight / totalActionWeight;
+                            raiseWeight = raiseWeight / totalActionWeight;
+                        }
+
                         const weightThreshold = 0.05;
-                        const fullWeightThreshold = 0.97; 
+                        const fullWeightThreshold = 0.99; // Can be higher due to normalization
 
                         if (callWeight >= fullWeightThreshold) {
                             pioCallRange.push(comboName);
