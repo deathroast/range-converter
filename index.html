@@ -44,9 +44,13 @@
             visibility: visible;
             opacity: 1;
         }
+        /* Add a border to the body to indicate it's a paste target */
+        .paste-target {
+            border: 2px dashed #4f46e5; /* Indigo color */
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4 transition-all duration-300">
 
     <div class="w-full max-w-6xl bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
         <div class="text-center mb-6">
@@ -64,7 +68,7 @@
                     <ol class="list-decimal list-inside text-gray-300 space-y-1">
                         <li>Take a screenshot of a range from GTO Wizard.</li>
                         <li><strong>Important:</strong> Crop the image to the 13x13 grid only.</li>
-                        <li>Select your cropped image file.</li>
+                        <li>Upload by clicking "Choose File" or **paste the image** anywhere on the page.</li>
                         <li>Click "Convert Range" to process.</li>
                     </ol>
                 </div>
@@ -74,7 +78,7 @@
                     <div id="image-preview-container" class="mt-4 w-full aspect-square bg-gray-700 rounded-lg flex items-center justify-center hidden">
                         <img id="image-preview" src="#" alt="Image Preview" class="max-w-full max-h-full rounded-md object-contain">
                     </div>
-                    <p id="image-prompt" class="mt-4 text-gray-500">No image selected</p>
+                    <p id="image-prompt" class="mt-4 text-gray-500">No image selected. You can also paste an image.</p>
                 </div>
             </div>
 
@@ -156,28 +160,60 @@
         convertBtn.addEventListener('click', processImage);
         copyBtnCall.addEventListener('click', () => copyToClipboard(outputCall, copyTooltipCall));
         copyBtnRaise.addEventListener('click', () => copyToClipboard(outputRaise, copyTooltipRaise));
+        
+        // --- NEW: Paste Event Listener ---
+        document.addEventListener('paste', handlePaste);
 
         // --- Functions ---
         
+        /**
+         * Handles the file input change event.
+         */
         function handleImageUpload(e) {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    imagePreview.src = event.target.result;
-                    imagePreviewContainer.classList.remove('hidden');
-                    imagePrompt.classList.add('hidden');
-                    convertBtn.disabled = false;
-                    outputCall.value = '';
-                    outputRaise.value = '';
-                }
-                reader.readAsDataURL(file);
-            } else {
-                imagePreviewContainer.classList.add('hidden');
-                imagePrompt.classList.remove('hidden');
-                convertBtn.disabled = true;
+                displayImageFile(file);
             }
         }
+
+        /**
+         * Handles the paste event for the entire document.
+         */
+        function handlePaste(e) {
+            // Prevent the default paste action
+            e.preventDefault();
+
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const imageFile = item.getAsFile();
+                    displayImageFile(imageFile);
+                    // Add a visual cue that paste was successful
+                    document.body.classList.add('paste-target');
+                    setTimeout(() => document.body.classList.remove('paste-target'), 500);
+                    break; // Stop after finding the first image
+                }
+            }
+        }
+
+        /**
+         * Takes a file object (from upload or paste), reads it, and displays the preview.
+         * @param {File} file The image file to display.
+         */
+        function displayImageFile(file) {
+             if (!file) return;
+             const reader = new FileReader();
+             reader.onload = function(event) {
+                 imagePreview.src = event.target.result;
+                 imagePreviewContainer.classList.remove('hidden');
+                 imagePrompt.classList.add('hidden');
+                 convertBtn.disabled = false;
+                 outputCall.value = '';
+                 outputRaise.value = '';
+             }
+             reader.readAsDataURL(file);
+        }
+
 
         function isRaisingColor(r, g, b) {
             const isSaturated = (Math.max(r, g, b) - Math.min(r, g, b)) > 30;
