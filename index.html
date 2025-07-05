@@ -217,22 +217,6 @@
             return r > 100 && b > 100 && r > g * 1.5 && b > g * 1.5;
         }
 
-        /**
-         * NEW: Checks if a color is a shade of gray, typical of folded hands.
-         * A color is gray if its R, G, and B components are very close to each other.
-         * @param {number} r Red channel (0-255)
-         * @param {number} g Green channel (0-255)
-         * @param {number} b Blue channel (0-255)
-         * @returns {boolean} True if the color is a shade of gray.
-         */
-        function isGray(r, g, b) {
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            // Gray colors have very low saturation (difference between max and min RGB)
-            // and are not pure black or white.
-            return (max - min) < 25 && (r + g + b > 50);
-        }
-
         async function processImage() {
             if (!imagePreview.src || imagePreview.src.startsWith('#')) return;
 
@@ -261,16 +245,6 @@
                         const endX = Math.floor(startX + cellWidth);
                         const startY = Math.floor(row * cellHeight);
                         const endY = Math.floor(startY + cellHeight);
-
-                        // --- NEW: Folded Hand Detection ---
-                        // Sample the text area (top-center) to see if it's grayed out.
-                        const textSampleX = startX + cellWidth * 0.5;
-                        const textSampleY = startY + cellHeight * 0.25;
-                        const textPixelData = ctx.getImageData(textSampleX, textSampleY, 1, 1).data;
-                        if (isGray(textPixelData[0], textPixelData[1], textPixelData[2])) {
-                            // If the text is gray, this hand is folded. Skip all weight calculations.
-                            continue;
-                        }
 
                         let callingPixelCount = 0;
                         let raisingPixelCount = 0;
